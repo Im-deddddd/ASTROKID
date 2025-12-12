@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ASTROKID</title>
+<style>
+  :root{
+    --glow: rgba(0,170,255,0.25);
+    --panel: rgba(0, 0, 0, 0.75);
+    --accent:#00aaff;
+    --accent-2:#36e2ff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:0; background:#000; color:#eaf7ff;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+  canvas#starfield{
+    position:fixed; inset:0; width:100vw; height:100vh; z-index:-1; pointer-events:none;
+  }
+  .container{max-width:1100px; margin:auto; padding:28px 18px 80px; transition: opacity .3s, transform .3s; }
+  h1{margin:0 0 10px; text-shadow:0 0 8px rgba(255,255,255,0.35)}
+  .sub{opacity:.8; margin-bottom:18px}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:12px;
+    padding:18px;
+    margin:18px 0;
+    box-shadow:0 0 15px var(--glow);
+    backdrop-filter: blur(8px);
+  }
+  .row{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px}
+  .row-3{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px}
+  .row-4{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; align-items:end}
+  label{font-weight:600; letter-spacing:.3px; display:block; margin-bottom:6px}
+  select, input, .select{
+    width:100%; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.15);
+    background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+    color:#e9f6ff; font-size:15px; outline:none;
+    box-shadow: inset 0 0 0 1px rgba(0,170,255,0.08), 0 0 10px rgba(0,170,255,0.12);
+  }
+  select{appearance:none; background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23aee1ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>'); background-repeat:no-repeat; background-position:right 12px center; background-size:16px}
+  input[type="number"]{background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03))}
+  input:focus, select:focus{border-color: rgba(0,170,255,0.6); box-shadow:0 0 0 2px rgba(0,170,255,0.28)}
+  .row + .row{margin-top:10px}
+
+  .btn{
+    margin-top:12px; padding:12px 18px; border:0; border-radius:8px;
+    background:var(--accent); color:#000; font-weight:700; cursor:pointer;
+    box-shadow:0 0 12px rgba(0,170,255,.35);
+  }
+  .btn:hover{filter:brightness(1.1)}
+  .btn.secondary{background:#12232f; color:#a8e8ff; border:1px solid rgba(0,170,255,0.25)}
+
+  .card{
+    display:grid; grid-template-columns:auto 1fr; gap:12px; align-items:center;
+    padding:12px; border-radius:10px; background:rgba(255,255,255,.04); margin-top:10px
+  }
+  .pill{
+    display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700;
+  }
+  .good{background:rgba(0,200,120,.18); color:#7ef7c7; border:1px solid rgba(0,200,120,.35)}
+  .bad{background:rgba(255,80,80,.18); color:#ffc9c9; border:1px solid rgba(255,80,80,.35)}
+  .neutral{background:rgba(255,255,255,.12); color:#dfefff; border:1px solid rgba(255,255,255,.2)}
+
+  .grid{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; margin-top:10px}
+  .metric{background:rgba(255,255,255,.04); padding:12px; border-radius:10px; border:1px solid rgba(255,255,255,.1)}
+  .metric h4{margin:0 0 6px; font-size:13px; letter-spacing:.4px; text-transform:uppercase; opacity:.85}
+  .metric .value{font-size:18px; font-weight:700}
+  small{opacity:.75}
+
+  .footnote{opacity:.7; font-size:12px; margin-top:10px}
+
+  /* Visualization */
+  .viz-wrap{position:fixed; inset:0; width:100vw; height:100vh; z-index:-1; background: radial-gradient(1200px 600px at 20% 10%, rgba(0,50,90,.35), rgba(0,0,0,.3) 50%, rgba(0,0,0,.7) 100%)}
+  canvas#viz{width:100%; height:100%; display:block; background:transparent; cursor:grab}
+  canvas#viz.dragging{cursor:grabbing}
+  .hud{position:absolute; inset:auto 12px 12px auto; padding:6px 8px; font-size:12px; border-radius:6px; background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.15)}
+  .legend{position:absolute; left:12px; bottom:12px; display:flex; gap:10px; padding:6px 8px; font-size:12px; border-radius:6px; background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.15)}
+  .dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px}
+  .sun{background:#ffd166; box-shadow:0 0 10px #ffd16670}
+  .mercury{background:#9e9e9e; box-shadow:0 0 10px #9e9e9e70}
+  .venus{background:#f0e68c; box-shadow:0 0 10px #f0e68c70}
+  .earth{background:#33ccff; box-shadow:0 0 10px #33ccff70}
+  .mars{background:#ff6b4a; box-shadow:0 0 10px #ff6b4a70}
+
+  .info-card{display:grid; grid-template-columns:96px 1fr; gap:14px; margin-top:12px; align-items:center}
+  .info-card img{width:96px; height:96px; object-fit:cover; border-radius:10px; border:1px solid rgba(255,255,255,.15)}
+  .info-card h3{margin:0}
+  .info-grid{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; margin-top:8px}
+  .info-item{background:rgba(255,255,255,.04); padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,.1); grid-column: span 2 / span 2;}
+  .info-item .k{font-size:12px; opacity:.8; text-transform:uppercase; letter-spacing:.3px}
+  .info-item .v{font:700 16px/1.2 'Segoe UI', system-ui}
+
+  .info-facts{
+    white-space: normal; font-size: 14px; font-weight: 400; line-height: 1.5; opacity: .9;
+  }
+
+  @media (max-width: 860px){
+    .row, .row-3, .row-4{grid-template-columns:1fr}
+    .info-grid{grid-template-columns:repeat(2, minmax(0,1fr))}
+    .info-card{grid-template-columns:64px 1fr}
+    .info-card img{width:64px; height:64px}
+  }
+</style>
+<style>
+  /* Panel Toggle Button */
+  .panels-toggle-btn {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 100;
+    width: 48px;
+    height: 48px;
+    background: var(--panel);
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 15px var(--glow);
+    backdrop-filter: blur(8px);
+  }
+  .panels-toggle-btn:hover { background: rgba(30,40,50,.9); }
+  .panels-hidden .container { opacity: 0; transform: translateY(-20px); pointer-events: none; }
+</style>
+</head>
+<body class="panels-hidden">
+  <canvas id="starfield"></canvas>
+  <div class="viz-wrap" id="vizWrap">
+    <canvas id="viz"></canvas>
+    <div class="hud" id="hud">Scale: — AU/pixel</div>
+    <div class="legend" id="legend">
+      <div><span class="dot sun"></span>Sun</div>
+      <div><span class="dot mercury"></span>Mercury</div>
+      <div><span class="dot venus"></span>Venus</div>
+      <div><span class="dot earth"></span>Earth</div>
+      <div><span class="dot mars"></span>Mars</div>
+    </div>
+  </div>
+
+  <button id="panelsToggle" class="panels-toggle-btn" title="Toggle Controls">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-2)"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+  </button>
+
+<div class="container">
+  <h1>ASTROKID Mission Planner</h1>
+  <div class="sub">Pick a departure world, a destination, and a launch date. Get window quality, trip time, delta‑V, and propellant needs.</div>
+
+  <!-- Visualization Controls + Canvas -->
+  <div class="panel" id="vizPanel">
+    <div class="row-4">
+      <div>
+        <label for="viewMode">View mode</label>
+        <select id="viewMode">
+          <option value="2d">2D heliocentric view</option>
+          <option value="3d">3D solar system model</option>
+          <option value="inc">Inclination / ascending node view</option>
+          <option value="cmp">Orbit comparison mode</option>
+        </select>
+      </div>
+      <div>
+        <label for="primaryPlanet">Primary planet</label>
+        <select id="primaryPlanet">
+          <option value="Mercury">Mercury</option>
+          <option value="Venus">Venus</option>
+          <option value="Earth">Earth</option>
+          <option value="Mars">Mars</option>
+        </select>
+      </div>
+      <div id="secondaryWrap" style="display:none">
+        <label for="secondaryPlanet">Compare with</label>
+        <select id="secondaryPlanet">
+          <option value="Mercury">Mercury</option>
+          <option value="Venus">Venus</option>
+          <option value="Mars">Mars</option>
+          <option value="Earth">Earth</option>
+        </select>
+      </div>
+      <div style="display:flex; gap:8px; align-items:end">
+        <button class="btn secondary" id="zoomOutBtn">−</button>
+        <button class="btn secondary" id="zoomInBtn">+</button>
+        <button class="btn secondary" id="resetViewBtn">Reset</button>
+        <button class="btn" id="fitBtn">Fit orbit</button>
+      </div>
+    </div>
+
+    <div class="row-4" style="margin-top:10px; align-items:end;">
+      <div>
+        <label>Animation</label>
+        <div style="display:flex; gap:8px;">
+          <button class="btn secondary" id="animPlayPauseBtn" style="width:80px; margin-top:0;">Play</button>
+          <select id="animSpeedSel" style="flex-grow:1;">
+            <option value="0">Paused</option>
+            <option value="1">1x (Real-time)</option>
+            <option value="3600">1 hour/sec</option>
+            <option value="86400" selected>1 day/sec</option>
+            <option value="604800">1 week/sec</option>
+            <option value="2592000">~1 month/sec</option>
+            <option value="31536000">~1 year/sec</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-card" id="planetInfo">
+      <img id="planetImg" src="Earth-image.jpg" alt="Planet image">
+      <div>
+        <h3 id="planetTitle">Earth — Overview</h3>
+        <div id="planetDesc" style="opacity:.85">Our home world. The third planet from the Sun, with liquid water and a protective atmosphere.</div>
+        <div class="info-grid" style="grid-template-columns:repeat(2, minmax(0,1fr));">
+          <div class="info-item"><div class="k">Orbital speed</div><div class="v" id="infoSpeed">—</div></div>
+          <div class="info-item"><div class="k">Distance from Sun</div><div class="v" id="infoRsun">—</div></div>
+          <div class="info-item"><div class="k">Distance from Earth</div><div class="v" id="infoRearth">—</div></div>
+          <div class="info-item"><div class="k">Orbit Period</div><div class="v" id="infoBlank1">—</div></div>
+        </div>
+        <div class="info-item" style="margin-top:10px">
+          <div class="k">Moon</div>
+          <div class="v info-facts" id="infoBlank2">—</div>
+        </div>
+        <div class="info-item" style="margin-top:10px">
+          <div class="k">Facts</div>
+          <div class="v info-facts" id="infoBlank3">—</div>
+        </div>
+        <div class="info-item" style="margin-top:10px" id="infoMissionsContainer">
+          <div class="k">Missions</div>
+          <div class="v info-facts" id="infoMissions">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mission Planner Inputs -->
+  <div class="panel">
+    <div class="row">
+      <div>
+        <label for="startPlanet">Starting planet</label>
+        <select id="startPlanet">
+          <option value="Mercury">Mercury</option>
+          <option value="Venus">Venus</option>
+          <option value="Earth">Earth</option>
+          <option value="Mars">Mars</option>
+        </select>
+      </div>
+      <div>
+        <label for="destPlanet">Destination planet</label>
+        <select id="destPlanet">
+          <option value="Mercury">Mercury</option>
+          <option value="Venus">Venus</option>
+          <option value="Earth">Earth</option>
+          <option value="Mars">Mars</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="launchDate">Launch date</label>
+        <input type="date" id="launchDate">
+      </div>
+      <div>
+        <label for="launchTime">Launch time (UTC)</label>
+        <input type="time" id="launchTime" step="1">
+      </div>
+    </div>
+
+    <button class="btn" id="planBtn">Plan Mission</button>
+  </div>
+
+  <!-- Results -->
+  <div class="panel" id="resultsPanel" style="display:none">
+    <div class="card">
+      <div class="pill neutral" id="windowBadge">Checking…</div>
+      <div>
+        <div><strong id="routeLabel">Earth ➝ Mars</strong></div>
+        <small id="dateEcho"></small>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="metric">
+        <h4>Trip time</h4>
+        <div class="value" id="tripTime">—</div>
+        <small>Hohmann half‑period (transfer) approximation</small>
+      </div>
+      <div class="metric">
+        <h4>Total delta‑V</h4>
+        <div class="value" id="deltaV">—</div>
+        <small>Injection + capture, circular and coplanar (approx.)</small>
+      </div>
+    </div>
+
+    <div class="footnote">
+      Assumptions: circular, coplanar Hohmann transfer around the Sun; patched‑conic estimate for departure/capture; no plane change; spherical cow. Values are for educational planning, not flight rules.
+    </div>
+  </div>
+</div>
+
+<script>
+/* Starfield background */
+(function() {
+  const c = document.getElementById('starfield');
+  const g = c.getContext('2d');
+  let stars = [], raf;
+  function resize(){ const dpr=window.devicePixelRatio||1; c.width=innerWidth*dpr; c.height=innerHeight*dpr; c.style.width=innerWidth+'px'; c.style.height=innerHeight+'px'; g.setTransform(dpr,0,0,dpr,0,0); init(); }
+  function init(){ const n=Math.round((innerWidth*innerHeight)/3200); stars=[...Array(n)].map(()=>({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:Math.random()*1.2+.2,a:Math.random(),w:Math.random()*0.015+0.005,v:Math.random()*0.2+0.05})); }
+  function draw(){ g.clearRect(0,0,innerWidth,innerHeight); for(const s of stars){ s.a+=s.w; const alpha=.5+.5*Math.sin(s.a*6.283); s.x+=s.v*.2; if(s.x>innerWidth+5) s.x=-5; g.fillStyle=`rgba(200,220,255,${alpha})`; g.beginPath(); g.arc(s.x,s.y,s.r,0,Math.PI*2); g.fill(); } raf=requestAnimationFrame(draw); }
+  addEventListener('resize',()=>{ cancelAnimationFrame(raf); resize(); draw(); });
+  resize(); draw();
+})();
+
+/* Mission planner core */
+const GMsun = 1.32712440018e20; // m^3/s^2
+const AU = 1.495978707e11; // precise AU
+
+// Planetary data (simplified Keplerian elements referenced approximately to J2000)
+// Units: angles in radians, a in meters, i/Ω/ω relative to ecliptic J2000
+const DEG = Math.PI/180;
+const planets = {
+  Mercury: {
+    name: 'Mercury',
+    a: 0.387098 * AU,
+    e: 0.205630,
+    i: 7.005 * DEG,
+    Omega: 48.331 * DEG,
+    omega: 29.124 * DEG,
+    L0: 252.25084 * DEG,
+    mu: 2.2032e13,
+    radius: 2439700,
+    color: '#9e9e9e',
+    img: 'https://i.pinimg.com/736x/b0/01/4c/b0014c1d260ca5d82f329d1bb54348c6.jpg',
+    desc: 'The smallest planet in our solar system and nearest to the Sun, Mercury is a world of extremes.',
+    orbitPeriod: '87.91 days',
+    fact1: ' It has no moon',
+    fact2: 'Mercury is the second smallest planet and the second densest in the solar system. It is 4,879 km in diameter compared with 12,749 km of the Earth. Though its the closest planet to the Sun, Mercury is not the hottest (that title belongs to Venus). However, it experiences the largest temperature fluctuations in the solar system which can reach 430 degree Celsius'
+  },
+  Venus: {
+    name: 'Venus',
+    a: 0.723332 * AU,
+    e: 0.006772,
+    i: 3.39458 * DEG,
+    Omega: 76.680 * DEG,
+    omega: 54.884 * DEG,
+    L0: 181.979 * DEG,
+    mu: 3.24859e14,
+    radius: 6051800,
+    color: '#f0e68c',
+    img: 'https://i.pinimg.com/1200x/17/8e/52/178e52d8d7ebc759be0cb46844e04dac.jpg',
+    desc: "Often called Earth's 'twin' for its similar size, but with a thick, toxic atmosphere.",
+    orbitPeriod: '224.55 days',
+    fact1: 'It does not have a single or natural moon.',
+    fact2: 'Venus is the second planet from the sun and the third brightest object in Earths sky after the sun and the moon. It rotates clockwise on its axis like Uranus and is 6,052 km in diameter. Venus is anything but hospitable, holding the title of the hottest planet in the solar system. This searing heat, averaging 464 degree Celsius (hot enough to melt lead), is caused by a runaway greenhouse effect driven by its dense atmosphere, which is nearly 97% carbon dioxid. Its entire surface is shrouded by thick clouds made of sulfuric acid, which contribute to a crushing atmospheric pressure that is 92 times greater than Earths sea level pressure'
+  },
+  Earth: {
+    name: 'Earth',
+    a: 1.00000011 * AU,
+    e: 0.01671022,
+    i: 0.00005 * DEG,
+    Omega: (-11.26064) * DEG, // longitude of ascending node
+    omega: 102.94719 * DEG,   // argument of periapsis
+    L0: 100.46435 * DEG,      // mean longitude at J2000
+    mu: 3.986004418e14,
+    radius: 6371000,
+    color: '#33ccff',
+    img: 'https://i.pinimg.com/1200x/2f/16/94/2f1694435c9c8f4b061261537be07fc6.jpg',
+    desc: 'Our home world. The third planet from the Sun, with liquid water and a protective atmosphere.',
+    orbitPeriod: '365.256 days',
+    fact1: "It has one natural satellite called the Moon",
+    fact2: 'Earth is the fifth largest planet and is uniquely referred to as the "blue planet" because over 70% of its surface is covered in water. With a diameter of 12,742 km, it stands out as the only known planet that supports life and is also the densest major body in the solar system. The planet ability to sustain life is directly linked to its critical atmospheric composition, which is comprised of 77% Nitrogen, 21% Oxygen, with only traces of Argon, Carbon Dioxide, Water, and other gases.'
+  },
+  Mars: {
+    name: 'Mars',
+    a: 1.52366231 * AU,
+    e: 0.09341233,
+    i: 1.85061 * DEG,
+    Omega: 49.57854 * DEG,
+    omega: 336.04084 * DEG,
+    L0: 355.45332 * DEG,
+    mu: 4.282837e13,
+    radius: 3389500,
+    color: '#ff6b4a',
+    img: 'https://i.pinimg.com/1200x/66/99/ac/6699ac5abcd6d1e2926d545148f8bfb8.jpg',
+    desc: 'The Red Planet. A cold desert world with the largest volcano and canyon in the solar system.',
+    orbitPeriod: '686.51 days',
+    fact1: 'It has two moon namely Phobos and Deimos. It has been predicted that in about 50 million years, Phobos will either crash into Mars surface or break up into a ring structure around the planet',
+    fact2: 'Mars is commonly referred to as the "Red Planet" due to its color. It can easily be seen from Earth with the naked eye, as can its reddish coloring. Physically, Mars is the second-smallest planet, with a diameter of 6,799 km. Its very thin atmosphere is overwhelmingly composed of carbon dioxide (specifically, 95.32 percent), with only minor amounts of other gases like Nitrogen, Argon, Oxygen, and trace amounts of carbon monoxide and other compounds.',
+    missions: 'Mars is currently the focus of intense international study, with exploration efforts primarily divided between surface and orbital missions. Two active NASA rovers are exploring the Martian surface: Perseverance Rover, which landed in 2021 to search for signs of ancient life and collect samples for future return to Earth, and Curiosity Rover, which landed in 2012 with a mission to determine if Mars ever had the right environmental conditions to support microbial life. These surface missions are supported by several international spacecraft currently orbiting the planet, which include NASA\'s Mars Odyssey and Mars Reconnaissance Orbiter (MRO), as well as the ESA\'s Mars Express.'
+  }
+};
+
+function hohmannTransfer(r1, r2, mu=GMsun){
+  const a_t = 0.5*(r1+r2);
+  const t_half = Math.PI * Math.sqrt(a_t**3/mu); // s
+  const v1 = Math.sqrt(mu/r1);
+  const v2 = Math.sqrt(mu/r2);
+  const v_peri = Math.sqrt(mu*(2/r1 - 1/a_t));
+  const v_apo  = Math.sqrt(mu*(2/r2 - 1/a_t));
+  const dV1 = Math.abs(v_peri - v1);
+  const dV2 = Math.abs(v2 - v_apo);
+  return { a_t, t_half, dV1, dV2, v1, v2, v_peri, v_apo };
+}
+
+function patchedConicBudget(start, dest){
+  const r1 = start.a, r2 = dest.a;
+  const { t_half, dV1, dV2 } = hohmannTransfer(r1, r2, GMsun);
+  const v_inf_dep = dV1;
+  const v_inf_arr = dV2;
+  const rParkEarth = 6.671e6; // m (Earth radius + ~300 km)
+  const rParkMars  = 3.589e6; // m (Mars radius + ~200 km)
+  function planetInjectionCost(planet, rPark, v_inf){
+    const muP = planets[planet].mu;
+    const v_circ = Math.sqrt(muP/rPark);
+    const v_esc  = Math.sqrt(2)*v_circ;
+    const v_req = Math.sqrt(v_inf*v_inf + v_esc*v_esc);
+    return Math.max(0, v_req - v_circ);
+  }
+  function planetCaptureCost(planet, rPark, v_inf){
+    const muP = planets[planet].mu;
+    const v_circ = Math.sqrt(muP/rPark);
+    const v_esc  = Math.sqrt(2)*v_circ;
+    const v_periHyp = Math.sqrt(v_inf*v_inf + v_esc*v_esc);
+    return Math.max(0, v_periHyp - v_circ);
+  }
+  const dV_dep = start.name==='Earth'
+    ? planetInjectionCost('Earth', rParkEarth, v_inf_dep)
+    : planetInjectionCost('Mars',  rParkMars,  v_inf_dep);
+  const dV_cap = dest.name==='Earth'
+    ? planetCaptureCost('Earth', rParkEarth, v_inf_arr)
+    : planetCaptureCost('Mars',  rParkMars,  v_inf_arr);
+  const total = dV1 + dV2 + dV_dep + dV_cap;
+  return { t_half, dV_sun: dV1 + dV2, dV_dep, dV_cap, total };
+}
+
+function windowQuality(start, dest, date){
+  const J2000 = new Date(Date.UTC(2000,0,1,12,0,0));
+  const t = (date - J2000)/1000; // s
+  const n = (r)=> Math.sqrt(GMsun/(r**3)); // rad/s
+  const theta = (r, phase0=0)=> (phase0 + n(r)*t) % (2*Math.PI);
+  const r1 = start.a, r2 = dest.a;
+  const th1 = theta(r1, 0);
+  const th2 = theta(r2, 0);
+  let ideal;
+  if (r1 < r2) {
+    ideal = Math.PI*(1 - Math.sqrt(Math.pow(r1/r2, 3)));
+  } else {
+    ideal = -Math.PI*(1 - Math.sqrt(Math.pow(r2/r1, 3)));
+  }
+  const rel = ((th2 - th1 + 3*Math.PI) % (2*Math.PI)) - Math.PI;
+  const err = Math.abs(rel - ideal);
+  const degErr = err * 180/Math.PI;
+  let score = 1 - Math.min(1, degErr/60);
+  return { score, degErr, rel, ideal };
+}
+
+function fmtDays(hours){ return (hours/24).toFixed(1) + ' days'; }
+function fmtDv(dv){ return (dv/1000).toFixed(2) + ' km/s'; }
+function fmtKm(x){ return (x/1000).toLocaleString(undefined,{maximumFractionDigits:0}) + ' km'; }
+function fmtAU(x){ return (x/AU).toFixed(3) + ' AU'; }
+
+/* Kepler propagation (elliptic) */
+const J2000 = new Date(Date.UTC(2000,0,1,12,0,0));
+function meanMotion(a){ return Math.sqrt(GMsun/(a*a*a)); }
+function keplerSolveE(M, e){
+  // Solve Kepler's equation M = E - e sinE for elliptic orbits
+  let E = M;
+  for(let i=0;i<10;i++){
+    const f = E - e*Math.sin(E) - M;
+    const fp = 1 - e*Math.cos(E);
+    const dE = -f/fp;
+    E += dE;
+    if(Math.abs(dE) < 1e-10) break;
+  }
+  return E;
+}
+function rotate3(v, Omega, i, omega){
+  // Rotation: Rz(Omega) Rx(i) Rz(omega) applied to vector v in orbital plane
+  const [x,y,z]=v;
+  const cO=Math.cos(Omega), sO=Math.sin(Omega);
+  const co=Math.cos(omega), so=Math.sin(omega);
+  const ci=Math.cos(i), si=Math.sin(i);
+  // Rz(omega)
+  let x1 =  co*x - so*y;
+  let y1 =  so*x + co*y;
+  let z1 =  z;
+  // Rx(i)
+  let x2 =  x1;
+  let y2 =  ci*y1 - si*z1;
+  let z2 =  si*y1 + ci*z1;
+  // Rz(Omega)
+  let x3 =  cO*x2 - sO*y2;
+  let y3 =  sO*x2 + cO*y2;
+  let z3 =  z2;
+  return [x3,y3,z3];
+}
+function propagatePlanet(p, date){
+  let t = (date - J2000)/1000; // seconds from J2000
+  if (p.name === 'Venus') {
+    const t_initial = (new Date(Date.UTC(2000,0,1,12,0,0)) - J2000)/1000; // This is 0
+    t = t_initial - (t - t_initial); // Reverse time relative to J2000 epoch
+  }
+  const n = meanMotion(p.a);
+  // Mean anomaly M = L - ϖ at epoch + n t; here approximate with L0 and omega/Omega
+  const varpi = (p.Omega + p.omega);
+  const M0 = (p.L0 - varpi);
+  const M = (M0 + n*t) % (2*Math.PI);
+  const E = keplerSolveE(M<0?M+2*Math.PI:M, p.e);
+  const cosE = Math.cos(E), sinE = Math.sin(E);
+  const r = p.a*(1 - p.e*cosE);
+  const nu = Math.atan2(Math.sqrt(1-p.e*p.e)*sinE, cosE - p.e); // true anomaly
+  const x_orb = r*Math.cos(nu);
+  const y_orb = r*Math.sin(nu);
+  const r3 = rotate3([x_orb, y_orb, 0], p.Omega, p.i, p.omega);
+  // Speed via vis-viva
+  const v = Math.sqrt(GMsun*(2/r - 1/p.a));
+  return { r3, r, nu, v };
+}
+
+/* Visualization */
+const viz = {
+  c: document.getElementById('viz'),
+  g: null,
+  wrap: document.getElementById('vizWrap'),
+  hud: document.getElementById('hud'),
+  modeSel: document.getElementById('viewMode'),
+  primarySel: document.getElementById('primaryPlanet'),
+  secondarySel: document.getElementById('secondaryPlanet'),
+  secondaryWrap: document.getElementById('secondaryWrap'),
+  state: {
+    mode: '2d',
+    date: new Date(),
+    scale: 120/ AU, // pixels per meter (initial ~120 px per AU)
+    pan: {x:0,y:0},
+    rot: { yaw: 35*DEG, pitch: 20*DEG }, // for 3D
+    dragging: false,
+    dragStart: {x:0,y:0},
+    panStart: {x:0,y:0},
+    trajectory: null
+  },
+  animating: false,
+  animSpeed: 86400, // multiplier: 1 = real-time, 86400 = 1 day/sec
+  lastFrameTime: 0
+};
+
+function resizeViz(){
+  const rect = viz.wrap.getBoundingClientRect();
+  const dpr = window.devicePixelRatio||1;
+  viz.c.width = rect.width*dpr;
+  viz.c.height = rect.height*dpr;
+  viz.c.style.width=rect.width+'px';
+  viz.c.style.height=rect.height+'px';
+  viz.g = viz.c.getContext('2d');
+  viz.g.setTransform(dpr,0,0,dpr,0,0);
+}
+
+function worldToScreen([x,y,z]){
+  // Apply simple camera rotation depending on mode
+  let X=x, Y=y, Z=z;
+  const m = viz.state.mode;
+  if(m==='3d' || m==='inc'){
+    const yaw = (m==='3d') ? viz.state.rot.yaw : 0; // inc view: look along nodes (no yaw)
+    const pitch = (m==='3d') ? viz.state.rot.pitch : 65*DEG; // inc view: high pitch to show tilt
+    const cy=Math.cos(yaw), sy=Math.sin(yaw);
+    const cp=Math.cos(pitch), sp=Math.sin(pitch);
+    // Yaw around Z
+    let x1 = cy*X - sy*Y;
+    let y1 = sy*X + cy*Y;
+    let z1 = Z;
+    // Pitch around X
+    let x2 = x1;
+    let y2 = cp*y1 - sp*z1;
+    let z2 = sp*y1 + cp*z1;
+    X=x2;Y=y2;Z=z2;
+  }
+  const s = viz.state.scale;
+  const sx = viz.c.width/ (window.devicePixelRatio||1) /2 + viz.state.pan.x + X*s;
+  const sy = viz.c.height/(window.devicePixelRatio||1)/2 + viz.state.pan.y - Y*s;
+  return [sx,sy,Z];
+}
+
+function drawSun(){
+  const g = viz.g; const [sx,sy] = worldToScreen([0,0,0]);
+  const r = Math.max(6, 10);
+  g.fillStyle='#ffd166';
+  g.beginPath(); g.arc(sx,sy,r,0,Math.PI*2); g.fill();
+  const gr = g.createRadialGradient(sx,sy,0,sx,sy,r*3); gr.addColorStop(0,'#ffd16655'); gr.addColorStop(1,'#0000');
+  g.fillStyle=gr; g.beginPath(); g.arc(sx,sy,r*3,0,Math.PI*2); g.fill();
+}
+
+function drawOrbit(p, opts={}){
+  const { color=p.color, width=1.2, alpha=0.9, samples=256 } = opts;
+  const g = viz.g; g.save(); g.globalAlpha = alpha; g.strokeStyle=color; g.lineWidth=width;
+  g.beginPath();
+  for(let i=0;i<=samples;i++){
+    const E = i/samples * 2*Math.PI;
+    const x = p.a * Math.cos(E);
+    const y = p.a * Math.sqrt(1 - p.e * p.e) * Math.sin(E);
+    const pt = rotate3([x,y,0], p.Omega, p.i, p.omega);
+    const [sx,sy] = worldToScreen(pt);
+    if(i===0) g.moveTo(sx,sy); else g.lineTo(sx,sy);
+  }
+  g.stroke(); g.restore();
+}
+
+function drawPlanet(p, state){
+  const { r3 } = propagatePlanet(p, state.date);
+  const [sx,sy] = worldToScreen(r3);
+  const g = viz.g;
+  g.fillStyle = p.color;
+  g.beginPath(); g.arc(sx,sy,4,0,Math.PI*2); g.fill();
+}
+
+function drawNodes(p){
+  // Ascending node vector is intersection of orbital plane with XY-plane at Ω; mark small triangles
+  const r_node = p.a*(1+p.e); // out near aphelion distance for marker spacing
+  const asc = rotate3([r_node,0,0], p.Omega, 0, 0); // place on reference direction then rotate only by Ω on XY
+  const asc2 = rotate3([r_node,0,0], p.Omega, p.i, p.omega); // actual orientation (for visualization alignment)
+  const [ax,ay] = worldToScreen(rotate3([p.a,0,0], p.Omega, p.i, p.omega));
+  const [dx,dy] = worldToScreen(rotate3([-p.a,0,0], p.Omega, p.i, p.omega));
+  const g = viz.g; g.save(); g.fillStyle=p.color; g.globalAlpha=.9;
+  g.beginPath(); g.moveTo(ax,ay-6); g.lineTo(ax-5,ay+4); g.lineTo(ax+5,ay+4); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(dx,dy+6); g.lineTo(dx-5,dy-4); g.lineTo(dx+5,dy-4); g.closePath(); g.fill();
+  g.restore();
+}
+
+function drawTrajectory(traj){
+  if(!traj) return;
+  const g = viz.g;
+  g.save();
+  g.strokeStyle = '#ffff00';
+  g.lineWidth = 2;
+  g.setLineDash([8, 6]);
+  g.beginPath();
+  const samples = 128; // Half orbit
+  for(let i=0; i<=samples; i++){
+    const E = traj.startE + (i/samples) * Math.PI; // Draw half an ellipse
+    const x = traj.a * (Math.cos(E) - traj.e);
+    const y = traj.a * (Math.sqrt(1 - traj.e*traj.e) * Math.sin(E));
+    const pt = rotate3([x,y,0], traj.Omega, traj.i, traj.omega);
+    const [sx,sy] = worldToScreen(pt);
+    if(i===0) g.moveTo(sx,sy); else g.lineTo(sx,sy);
+  }
+  g.stroke();
+  g.restore();}
+function render(){
+  const g = viz.g; if(!g) return;
+  const cw = viz.c.width/(window.devicePixelRatio||1), ch = viz.c.height/(window.devicePixelRatio||1);
+  g.clearRect(0,0,cw,ch);
+  // Grid rings
+  g.save(); g.strokeStyle='rgba(255,255,255,.08)'; g.lineWidth=1; const [cx,cy]=worldToScreen([0,0,0]);
+  const ringsAU = [0.5,1,1.5,2,2.5];
+  for(const ra of ringsAU){
+    const rpx = ra*AU*viz.state.scale;
+    g.beginPath(); g.arc(cx,cy,rpx,0,Math.PI*2); g.stroke();
+    g.fillStyle='rgba(255,255,255,.25)'; g.font='11px system-ui'; g.fillText(`${ra} AU`, cx+rpx+4, cy-2);
+  }
+  g.restore();
+
+  drawSun();
+
+  const pmode = viz.state.mode;
+  if(pmode==='cmp'){
+    const p1 = planets[viz.primarySel.value];
+    const p2 = planets[viz.secondarySel.value];
+    drawOrbit(p1);
+    drawOrbit(p2, { color: p2.color });
+    drawPlanet(p1, viz.state);
+    drawPlanet(p2, viz.state);
+  } else {
+    for (const pName in planets) {
+      const p = planets[pName];
+      drawOrbit(p, {alpha: p.name === viz.primarySel.value ? 0.9 : 0.4, width: p.name === viz.primarySel.value ? 1.5 : 1});
+      if(pmode==='inc' && p.name === viz.primarySel.value){ drawNodes(p); }
+      drawPlanet(p, viz.state);
+    }
+  }
+
+  // Draw mission trajectory if it exists
+  drawTrajectory(viz.state.trajectory);
+
+  // HUD scale
+  const auPerPx = 1/(viz.state.scale*AU);
+  viz.hud.textContent = `Scale: ${(auPerPx).toFixed(4)} AU/pixel`;
+}
+
+/* Animation Loop */
+function animationLoop(timestamp) {
+  if (!viz.animating) {
+    viz.lastFrameTime = 0;
+    return;
+  }
+
+  if (viz.lastFrameTime === 0) {
+    viz.lastFrameTime = timestamp;
+  }
+
+  const deltaTime = (timestamp - viz.lastFrameTime) / 1000; // seconds
+  viz.lastFrameTime = timestamp;
+
+  if (viz.animSpeed > 0) {
+    const timeIncrement = deltaTime * viz.animSpeed * 1000; // milliseconds to add to date
+    viz.state.date = new Date(viz.state.date.getTime() + timeIncrement);
+
+    // Update the date/time inputs in the mission planner to reflect the animation time
+    updatePlannerDateTime(viz.state.date);
+    updateInfo(viz.primarySel.value);
+    render();
+  }
+
+  requestAnimationFrame(animationLoop);
+}
+
+function toggleAnimation(forceState) {
+  viz.animating = (forceState !== undefined) ? forceState : !viz.animating;
+  document.getElementById('animPlayPauseBtn').textContent = viz.animating ? 'Pause' : 'Play';
+  if (viz.animating) requestAnimationFrame(animationLoop);
+}
+/* Zoom/Pan */
+function zoomAt(factor, mx, my){
+  const before = screenToWorld(mx,my);
+  viz.state.scale *= factor;
+  viz.state.scale = Math.min(Math.max(viz.state.scale, 10/AU), 2000/AU); // clamp
+  const after = screenToWorld(mx,my);
+  viz.state.pan.x += (after[0]-before[0]) * viz.state.scale;
+  viz.state.pan.y -= (after[1]-before[1]) * viz.state.scale;
+}
+function screenToWorld(sx,sy){
+  const x = (sx - viz.c.width/(window.devicePixelRatio||1)/2 - viz.state.pan.x) / viz.state.scale;
+  const y = -(sy - viz.c.height/(window.devicePixelRatio||1)/2 - viz.state.pan.y) / viz.state.scale;
+  return [x,y,0];
+}
+
+function attachInteractions(){
+  const c = viz.c;
+  c.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const factor = (e.deltaY<0) ? 1.1 : 0.9;
+    const rect=c.getBoundingClientRect();
+    const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+    zoomAt(factor, mx, my);
+    render();
+  }, {passive:false});
+  c.addEventListener('mousedown', (e)=>{
+    viz.state.dragging=true; viz.state.dragStart={x:e.clientX,y:e.clientY}; viz.state.panStart={...viz.state.pan};
+    c.classList.add('dragging');
+  });
+  window.addEventListener('mouseup', ()=>{viz.state.dragging=false; c.classList.remove('dragging');});
+  window.addEventListener('mousemove', (e)=>{
+    if(!viz.state.dragging) return;
+    const dx = e.clientX - viz.state.dragStart.x;
+    const dy = e.clientY - viz.state.dragStart.y;
+    if (viz.state.mode === '3d' || viz.state.mode === 'inc') {
+      // In 3D modes, drag should rotate the view
+      viz.state.rot.yaw -= dx * 0.005;
+      viz.state.rot.pitch -= dy * 0.005;
+      viz.state.dragStart = { x: e.clientX, y: e.clientY }; // Reset for continuous rotation
+    } else {
+      // In 2D mode, drag pans the view
+      viz.state.pan.x = viz.state.panStart.x + dx;
+      viz.state.pan.y = viz.state.panStart.y + dy;
+    }
+    render();
+  });
+  c.addEventListener('dblclick', ()=>{ viz.state.pan={x:0,y:0}; render(); });
+}
+
+function fitOrbit(name){
+  const p = planets[name];
+  const ap = p.a*(1+p.e); // max radius
+  const margin = 0.9; // 90% of half-min dimension
+  const cw = viz.c.width/(window.devicePixelRatio||1), ch = viz.c.height/(window.devicePixelRatio||1);
+  const minHalf = Math.min(cw, ch)/2 * margin;
+  viz.state.scale = minHalf / ap;
+  viz.state.pan = {x:0,y:0};
+}
+
+/* Info card */
+const infoEls = {
+  card: document.getElementById('planetInfo'),
+  img: document.getElementById('planetImg'),
+  title: document.getElementById('planetTitle'),
+  desc: document.getElementById('planetDesc'),
+  speed: document.getElementById('infoSpeed'),
+  rsun: document.getElementById('infoRsun'),
+  rearth: document.getElementById('infoRearth'),
+  blank1: document.getElementById('infoBlank1'),
+  blank2: document.getElementById('infoBlank2'),
+  blank3: document.getElementById('infoBlank3'),
+  missions: document.getElementById('infoMissions'),
+};
+
+function updateInfo(name){
+  const p = planets[name];
+  const d = viz.state.date;
+  const P = propagatePlanet(p, d);
+  const earthP = propagatePlanet(planets.Earth, d);
+  const dx = P.r3[0]-earthP.r3[0], dy = P.r3[1]-earthP.r3[1], dz = P.r3[2]-earthP.r3[2];
+  const distEarth = Math.sqrt(dx*dx+dy*dy+dz*dz);
+
+  infoEls.img.src = p.img;
+  infoEls.title.textContent = `${p.name}`;
+  infoEls.desc.textContent = p.desc;
+  infoEls.speed.textContent = `${(P.v/1000).toFixed(2)} km/s`;
+  infoEls.rsun.textContent = `${fmtAU(P.r)} (${fmtKm(P.r)})`;
+  infoEls.rearth.textContent = name==='Earth' ? '0 km' : `${fmtAU(distEarth)} (${fmtKm(distEarth)})`;
+  infoEls.blank1.textContent = p.orbitPeriod || '-';
+  infoEls.blank2.textContent = p.fact1 || '-';
+  infoEls.blank3.textContent = p.fact2 || '-';
+  
+  const missionsContainer = document.getElementById('infoMissionsContainer');
+  if (p.missions) {
+    infoEls.missions.textContent = p.missions;
+    missionsContainer.style.display = 'grid';
+  } else {
+    missionsContainer.style.display = 'none';
+  }
+}
+
+function synodicPeriod(p1, p2){
+  const n1 = meanMotion(p1.a), n2 = meanMotion(p2.a);
+  return 2*Math.PI/Math.abs(n1-n2); // seconds
+}
+
+/* UI glue */
+const els = {
+  start: document.getElementById('startPlanet'),
+  dest: document.getElementById('destPlanet'),
+  date: document.getElementById('launchDate'),
+  time: document.getElementById('launchTime'),
+  plan: document.getElementById('planBtn'),
+
+  panel: document.getElementById('resultsPanel'),
+  badge: document.getElementById('windowBadge'),
+  route: document.getElementById('routeLabel'),
+  dateEcho: document.getElementById('dateEcho'),
+  tripTime: document.getElementById('tripTime'),
+  deltaV: document.getElementById('deltaV'),
+};
+
+// default dates = now UTC for both viz and planner
+(function initDate(){
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth()+1).padStart(2,'0');
+  const d = String(now.getUTCDate()).padStart(2,'0');
+  const hh = String(now.getUTCHours()).padStart(2,'0');
+  const mm = String(now.getUTCMinutes()).padStart(2,'0');
+  const ss = String(now.getUTCSeconds()).padStart(2,'0');
+  els.date.value = `${y}-${m}-${d}`;
+  els.time.value = `${hh}:${mm}:${ss}`;
+  viz.state.date = new Date(Date.UTC(y, (Number(m)||1)-1, Number(d)||1, Number(hh)||0, Number(mm)||0, Number(ss)||0));
+})();
+
+function updatePlannerDateTime(date) {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  const hh = String(date.getUTCHours()).padStart(2, '0');
+  const mm = String(date.getUTCMinutes()).padStart(2, '0');
+  const ss = String(date.getUTCSeconds()).padStart(2, '0');
+  els.date.value = `${y}-${m}-${d}`;
+  els.time.value = `${hh}:${mm}:${ss}`;
+}
+
+els.plan.addEventListener('click', () => {
+  const sName = els.start.value;
+  const dName = els.dest.value;
+  if (sName === dName) { alert('Starting and destination planets must be different.'); return; }
+  const [Y, M, D] = els.date.value ? els.date.value.split('-').map(Number) : [NaN,NaN,NaN];
+  const [hh, mm, ss] = els.time.value ? els.time.value.split(':').map(Number) : [0,0,0];
+  if (!isFinite(Y)) { alert('Please choose a valid launch date.'); return; }
+
+  const start = planets[sName];
+  const dest  = planets[dName];
+  const launchDate = new Date(Date.UTC(Y, (M||1)-1, D||1, hh||0, mm||0, ss||0));
+  const wq = windowQuality(start, dest, launchDate);
+  const badge = els.badge;
+  badge.textContent = wq.score >= 0.7 ? 'Good window' : (wq.score >= 0.4 ? 'Fair window' : 'Poor window');
+  badge.className = 'pill ' + (wq.score >= 0.7 ? 'good' : (wq.score >= 0.4 ? 'neutral' : 'bad'));
+  els.route.textContent = `${sName} ➝ ${dName}`;
+  els.dateEcho.textContent = `Launch: ${viz.state.date.toUTCString()} • Phase error: ${wq.degErr.toFixed(1)}°`;
+  const budget = patchedConicBudget(start, dest);
+  const totalDV = budget.total;
+  els.tripTime.textContent = fmtDays(budget.t_half/3600);
+  els.deltaV.textContent = fmtDv(totalDV);
+  els.panel.style.display = '';
+
+  // For visualization: calculate and store trajectory
+  const r1 = start.a, r2 = dest.a;
+  const a_t = 0.5 * (r1 + r2);
+  const e_t = Math.abs(r1 - r2) / (r1 + r2);
+  const startPos = propagatePlanet(start, viz.state.date);
+  
+  viz.state.trajectory = {
+    a: a_t,
+    e: e_t,
+    i: start.i, // Assume coplanar for simplicity
+    Omega: start.Omega, // Assume same plane for simplicity
+    omega: startPos.nu - (r1 < r2 ? 0 : Math.PI), // Align periapsis/apoapsis with departure
+    startE: (r1 < r2 ? 0 : Math.PI) // Start at periapsis (E=0) or apoapsis (E=PI)
+  };
+  render(); // Re-render the visualization to show the new trajectory
+});
+
+/* Wire visualization UI */
+function onModeChange(){
+  viz.state.mode = viz.modeSel.value;
+  viz.secondaryWrap.style.display = (viz.state.mode==='cmp') ? '' : 'none';
+  if(viz.state.mode!=='3d'){ viz.state.rot={yaw:0, pitch:0}; }
+  updateInfo(viz.primarySel.value);
+  render();
+}
+
+function onPlanetChange(){
+  if(viz.state.mode==='cmp' && viz.primarySel.value===viz.secondarySel.value){
+    // auto switch to another planet
+    const pName = viz.primarySel.value;
+    if (pName === 'Earth') viz.secondarySel.value = 'Mars';
+    else if (pName === 'Mars') viz.secondarySel.value = 'Earth';
+    else if (pName === 'Venus') viz.secondarySel.value = 'Earth';
+    else if (pName === 'Mercury') viz.secondarySel.value = 'Venus';
+
+  }
+  fitOrbit(viz.primarySel.value);
+  updateInfo(viz.primarySel.value);
+  render();
+}
+
+function onCompareChange(){ render(); }
+
+// Init
+function initViz(){
+  resizeViz();
+  attachInteractions();
+  fitOrbit(viz.primarySel.value);
+  updateInfo(viz.primarySel.value);
+  render();
+}
+
+addEventListener('resize', ()=>{ resizeViz(); render(); });
+
+viz.modeSel.addEventListener('change', onModeChange);
+viz.primarySel.addEventListener('change', onPlanetChange);
+viz.secondarySel.addEventListener('change', onCompareChange);
+
+// Zoom buttons
+ document.getElementById('zoomInBtn').addEventListener('click', ()=>{ const rect=viz.c.getBoundingClientRect(); zoomAt(1.2, rect.width/2, rect.height/2); render(); });
+ document.getElementById('zoomOutBtn').addEventListener('click', ()=>{ const rect=viz.c.getBoundingClientRect(); zoomAt(1/1.2, rect.width/2, rect.height/2); render(); });
+ document.getElementById('resetViewBtn').addEventListener('click', ()=>{ viz.state.pan={x:0,y:0}; viz.state.scale=120/AU; render(); });
+ document.getElementById('fitBtn').addEventListener('click', ()=>{ fitOrbit(viz.primarySel.value); render(); });
+
+ // Animation controls
+ document.getElementById('animPlayPauseBtn').addEventListener('click', () => toggleAnimation());
+ document.getElementById('animSpeedSel').addEventListener('change', (e) => {
+   viz.animSpeed = Number(e.target.value);
+   if (viz.animSpeed > 0 && !viz.animating) toggleAnimation(true);
+   if (viz.animSpeed === 0 && viz.animating) toggleAnimation(false);
+ });
+ // Panel toggle
+ document.getElementById('panelsToggle').addEventListener('click', ()=> document.body.classList.toggle('panels-hidden'));
+
+// Kickoff
+initViz();
+</script>
+</body>
+</html>
